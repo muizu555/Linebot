@@ -1,12 +1,147 @@
+import {
+  createData, deleteData, readData, updateData,
+} from '../../crud.js';
+import { error } from '../../log.js';
+import { get } from '../../request.js';
 // ユーザーのプロフィールを取得する関数
 const getUserProfile = (event, client) => client.getProfile(event.source.userId);
 
 // 受け取ったメッセージと返信するメッセージ(を返す関数)をマッピング
-export const messageMap = {
+export const messageMap = {// keyがテキスト(ex.こんにちは)で関数(オブジェクト)が返る
+  メモ: async (event, appContext) => {
+    const memoData = await readData(event.source.userId, 'memo', appContext);
+    if (memoData.Items[0]) {
+      return {
+        type: 'text',
+        text: `メモには以下のメッセージが保存されています\n\n${memoData.Items[0].Data}`,
+      };
+    }
+
+    return {
+      type: 'text',
+      text: 'メモが存在しません',
+    };
+  },
+  メモ開始: async (event, appContext) => {
+    await createData(event.source.userId, 'context', 'memoMode', appContext);
+    return {
+      type: 'text',
+      text: 'メモモードを開始しました',
+    };
+  },
+
+  天気予報: async () => {
+    const weatherApiRes = (await get('https://www.jma.go.jp/bosai/forecast/data/forecast/070000.json')).data;
+    console.log(weatherApiRes);
+    // 返信するメッセージを作成
+    return {
+      type: 'text',
+      text: `【天気予報】
+    
+    ${weatherApiRes[0].timeSeries[0].timeDefines[0]}: ${weatherApiRes[0].timeSeries[0].areas[2].weathers[0]}
+    ${weatherApiRes[0].timeSeries[0].timeDefines[1]}: ${weatherApiRes[0].timeSeries[0].areas[2].weathers[1]}
+    ${weatherApiRes[0].timeSeries[0].timeDefines[2]}: ${weatherApiRes[0].timeSeries[0].areas[2].weathers[2]} 
+    `,
+    };
+  },
+
+  Create: async (event, appContext) => {
+    const date = new Date();
+    await createData(event.source.userId, 'testData', `Data created at ${date}`, appContext);
+    return {
+      type: 'text',
+      text: 'データが作成されました',
+    };
+  },
+  Read: async (event, appContext) => {
+    const dbData = await readData(event.source.userId, 'testData', appContext);
+    return {
+      type: 'text',
+      text: `DBには以下のデータが保存されています\n\n${dbData.Items[0].Data}`,
+    };
+  },
+  Update: async (event, appContext) => {
+    const date = new Date();
+    await updateData(event.source.userId, 'testData', `Data created at ${date}`, appContext);
+    return {
+      type: 'text',
+      text: 'データを更新しました',
+    };
+  },
+  Delete: async (event, appContext) => {
+    await deleteData(event.source.userId, 'testData', appContext);
+    return {
+      type: 'text',
+      text: 'データを削除しました',
+    };
+  },
+
+  ニュース1: async () => {
+    // ニュースAPIのレスポンスを格納する変数を宣言
+    let newsApiRes;
+    // エラーハンドリング
+    try {
+      // APIのレスポンスをnewsApiResに格納
+      newsApiRes = (await get(`https://newsapi.org/v2/top-headlines?country=jp&apiKey=${process.env.NEWS_API_KEY}&pageSize=5`)).data;
+    } catch (e) {
+      error(`news API error: ${e}`);
+      return {
+        type: 'text',
+        text: 'ニュースAPIのリクエストでエラーが発生しました',
+      };
+    }
+    // 返信するメッセージの配列を用意
+    const message = [];
+
+    // newsApiRes.articlesを取り出す(分割代入という記法)
+    const { articles } = newsApiRes;
+    // articles(配列)の長さ分ループを回す
+    // 配列の要素がarticleに格納される
+    articles.forEach((article) => {
+      // 配列にメッセージを追加
+      message.push({
+        type: 'text',
+        text: `【画像URL】: ${article.urlToImage}\n【タイトル】: ${article.title}\n【公開日】: ${article.publishedAt}\n【概要】: ${article.description}\n【記事のURL】: ${article.url}\n【掲載元】: ${article.source.name}`,
+      });
+    });
+
+    return message;
+  },
+
+
+  //後でフレックスメッセージについての演習もやること
+
   こんにちは: () => ({
     type: 'text',
-    text: 'Hello, world',
+    text: 'こんにちは世界',
   }),
+  //追加
+  おはよう: () => ({
+    type: 'text',
+    text: 'Good Morning!',
+  }),
+  Monday: () => ({
+    type: 'text',
+    text: '学校にいけ！',
+  }),
+  Tuesday: () => ({
+    type: 'text',
+    text: '学校にいけ！',
+  }),
+  Wednesday: () => ({
+    type: 'text',
+    text: '学校にいけ！',
+  }),
+  Thursday: () => ({
+    type: 'text',
+    text: '学校にいけ！',
+  }),
+  Friday: () => ({
+    type: 'text',
+    text: '学校にいけ！',
+  }),
+
+
   複数メッセージ: () => ([
     {
       type: 'text',
@@ -41,6 +176,55 @@ export const messageMap = {
           action: {
             type: 'location',
             label: '位置情報画面を開く',
+          },
+        },
+      ],
+    },
+  }),
+  //追加
+  予定: () => ({
+    type: 'text',
+    text: '何曜日の予定が知りたいですか？',
+    quickReply: {
+      items: [
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            text: "Monday",
+            label: '月曜日',
+          },
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            text: "Tuesday",
+            label: '火曜日',
+          },
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            text: "Wednesday",
+            label: '水曜日',
+          },
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            text: "Thursday",
+            label: '木曜日',
+          },
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            text: "Friday",
+            label: '金曜日',
           },
         },
       ],
